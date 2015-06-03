@@ -19,7 +19,7 @@ function Initialize(Plugin)
 	-- Bind all the console commands
 	RegisterPluginInfoConsoleCommands()
 	
-	cRoot:Get():GetDefaultWorld():ScheduleTask(10, DoTick)
+	DoTick(cRoot:Get():GetDefaultWorld())
 	
 	LOG("[" .. Plugin:GetName() .. "] Version " .. Plugin:GetVersion() .. ", initialised")
 	return true
@@ -29,14 +29,16 @@ function ApplyCombatTo(Player)
 	Player = tolua.cast(Player,"cPlayer")
 	if not Player:HasPermission("combat.bypass") then
 		if StartOfCombat[Player:GetUniqueID()] == nil then
-			if ChatNotifications then
+			if ChatNotifications or Player:GetClientHandle():GetProtocolVersion() < 6 then
 				Player:SendMessageInfo("§fYou are now in combat.")
 				Player:SendMessageInfo("§fDo not disconnect or you'll die.")
 			end
+		end
+		if not ChatNotifications then
 			if CombatTime == 1 then
-				Player:SendAboveActionBarMessage("§f§l " .. CombatTime .. " second of combat left.")
+				Player:SendAboveActionBarMessage("§f§l " .. CombatTime .. " second of combat left")
 			else
-				Player:SendAboveActionBarMessage("§f§l " .. CombatTime .. " seconds of combat left.")
+				Player:SendAboveActionBarMessage("§f§l " .. CombatTime .. " seconds of combat left")
 			end
 		end
 		StartOfCombat[Player:GetUniqueID()] = GetTime()
@@ -55,8 +57,6 @@ function OnTakeDamage(Receiver, TDI)
 		return false  
 	end
 	if (Receiver:IsPlayer() and TDI.Attacker:IsPlayer()) then
-		Receiver = tolua.cast(Receiver,"cPlayer")
-		TDI.Attacker = tolua.cast(TDI.Attacker,"cPlayer")
 		ApplyCombatTo(Receiver)
 		ApplyCombatTo(TDI.Attacker)
 	end
@@ -104,8 +104,8 @@ function OnPlayerDestroyed(Player)
 		end
 		if DropXPOnCombatLog then
 			local tempxp = Player:GetCurrentXp()
-			Player:GetWorld():ScheduleTask(40, function(World)
-				World:SpawnExperienceOrb(Player:GetPosX(), Player:GetPosY()+2, Player:GetPosZ(), max(tempxp,200))
+			Player:GetWorld():ScheduleTask(20, function(World)
+				World:SpawnExperienceOrb(Player:GetPosX(), Player:GetPosY()+2, Player:GetPosZ(), math.min(tempxp,MAX_EXPERIENCE_ORB_SIZE))
 			end)
 			Player:SetCurrentExperience(0)
 		end
@@ -116,20 +116,22 @@ function DoTick(World)
 	cRoot:Get():ForEachPlayer(function(Player)
 		if not ( StartOfCombat[Player:GetUniqueID()] == nil ) then
 			if StartOfCombat[Player:GetUniqueID()] + CombatTime > GetTime() then
-				if StartOfCombat[Player:GetUniqueID()] == GetTime() - CombatTime + 1 then
-					Player:SendAboveActionBarMessage("§f§l " .. CombatTime - (GetTime() - StartOfCombat[Player:GetUniqueID()])  .. " second of combat left.")
-				else
-					Player:SendAboveActionBarMessage("§f§l " .. CombatTime - (GetTime() - StartOfCombat[Player:GetUniqueID()]) .. " seconds of combat left.")
+				if not ChatNotifications then
+					if StartOfCombat[Player:GetUniqueID()] == GetTime() - CombatTime + 1 then
+						Player:SendAboveActionBarMessage("§f§l " .. CombatTime - (GetTime() - StartOfCombat[Player:GetUniqueID()])  .. " second of combat left")
+					else
+						Player:SendAboveActionBarMessage("§f§l " .. CombatTime - (GetTime() - StartOfCombat[Player:GetUniqueID()]) .. " seconds of combat left")
+					end
 				end
 			else 
 				StartOfCombat[Player:GetUniqueID()] = nil
-				Player:SendAboveActionBarMessage("§f§l You are no longer in combat.")
-				if ChatNotifications then 
+				if ChatNotifications or Player:GetClientHandle():GetProtocolVersion() < 6 then 
 					Player:SendMessageInfo("§fYou are no longer in combat.")
+				else
+					Player:SendAboveActionBarMessage("§f§l You are no longer in combat")
 				end
 			end
 		end
 	end)
-	
-	World:ScheduleTask(10, DoTick)
+	World:ScheduleTask(5, DoTick)
 end
