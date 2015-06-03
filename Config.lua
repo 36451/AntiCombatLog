@@ -1,11 +1,10 @@
--- Combat settings
+-- Player
 CombatTime           = 20
 MobCombat            = true
 CommandsInCombat     = false
 TeleportInCombat     = false
 ChatNotifications    = false
-
--- Sanctions
 DropXPOnCombatLog    = true
+
+-- Global 
 BroadcastOnCombatLog = true
-DropItemsOnCombatLog = true
