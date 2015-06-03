@@ -7,12 +7,13 @@ function Initialize(Plugin)
 	Plugin:SetVersion(2)
 	
 	-- Register Hooks
-	cPluginManager:AddHook(cPluginManager.HOOK_KILLING,          OnKilling        )
-	cPluginManager:AddHook(cPluginManager.HOOK_TAKE_DAMAGE,	     OnTakeDamage     )
-	cPluginManager:AddHook(cPluginManager.HOOK_PLAYER_SPAWNED,   OnPlayerSpawned  )
-	cPluginManager:AddHook(cPluginManager.HOOK_EXECUTE_COMMAND,  OnExecuteCommand )
-	cPluginManager:AddHook(cPluginManager.HOOK_ENTITY_TELEPORT,  OnEntityTeleport )
-	cPluginManager:AddHook(cPluginManager.HOOK_PLAYER_DESTROYED, OnPlayerDestroyed)
+	cPluginManager:AddHook(cPluginManager.HOOK_KILLING,               OnKilling            )
+	cPluginManager:AddHook(cPluginManager.HOOK_TAKE_DAMAGE,	          OnTakeDamage         )
+	cPluginManager:AddHook(cPluginManager.HOOK_PLAYER_SPAWNED,        OnPlayerSpawned      )
+	cPluginManager:AddHook(cPluginManager.HOOK_EXECUTE_COMMAND,       OnExecuteCommand     )
+	cPluginManager:AddHook(cPluginManager.HOOK_ENTITY_TELEPORT,       OnEntityTeleport     )
+	cPluginManager:AddHook(cPluginManager.HOOK_PLAYER_DESTROYED,      OnPlayerDestroyed    )
+	cPluginManager:AddHook(cPluginManager.HOOK_PROJECTILE_HIT_ENTITY, OnProjectileHitEntity)
 
 	-- Load the InfoReg shared library
 	dofile(cPluginManager:GetPluginsPath() .. "/InfoReg.lua")
@@ -29,7 +30,7 @@ end
 
 function ApplyCombatTo(Player)
 	Player = tolua.cast(Player,"cPlayer")
-	if not Player:HasPermission("combat.bypass") then
+	if not Player:HasPermission("combat.bypass") and not Player:IsGameModeCreative() and not Player:IsGameModeSpectator() then
 		if StartOfCombat[Player:GetUniqueID()] == nil then
 			if ChatNotifications or Player:GetClientHandle():GetProtocolVersion() < 6 then
 				Player:SendMessage("§4[CombatLog]§r " .. "§fYou are now in combat.")
@@ -123,6 +124,25 @@ function OnPlayerDestroyed(Player)
 			KillOnNextLogin[Player:GetUUID()] = true
 		end
 	end
+end
+
+function OnProjectileHitEntity(ProjectileEntity, Entity)
+	if ProjectileEntity:GetCreatorUniqueID() == cEntity.INVALID_ID then
+		return false
+	end
+	Entity:GetWorld():DoWithEntityByID(ProjectileEntity:GetCreatorUniqueID(), function (AEntity)
+		if (Entity:IsPlayer() and AEntity:IsPlayer()) then
+			ApplyCombatTo(Entity)
+			ApplyCombatTo(AEntity)
+		end
+		if MobCombat and (Entity:IsPlayer() or AEntity:IsPlayer()) and (Entity:IsMob() or AEntity:IsMob()) then
+			if Entity:IsPlayer() then
+				ApplyCombatTo(Entity)
+			else
+				ApplyCombatTo(AEntity)
+			end
+		end
+	end)
 end
 
 function DoTick(World)
